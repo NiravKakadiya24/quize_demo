@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:camera/camera.dart';
 import 'package:demo_projects/main.dart';
@@ -36,7 +37,6 @@ class _QuizViewScreenState extends State<QuizViewScreen>
   CameraController? controller;
   XFile? imageFile;
   XFile? videoFile;
-  VideoPlayerController? videoController;
   VoidCallback? videoPlayerListener;
   bool enableAudio = true;
   double _minAvailableExposureOffset = 0.0;
@@ -58,8 +58,17 @@ class _QuizViewScreenState extends State<QuizViewScreen>
 
   int delayTime = 3;
 
+  bool isOnceRecorded = false;
+  late VideoPlayerController _controller;
+
   @override
   void initState() {
+    _controller = VideoPlayerController.network(
+        'https://flutter.github.io/assets-for-api-docs/assets/videos/bee.mp4')
+      ..initialize().then((_) {
+        // Ensure the first frame is shown after the video is initialized, even before the play button has been pressed.
+        setState(() {});
+      });
     super.initState();
     _ambiguate(WidgetsBinding.instance)?.addObserver(this);
 
@@ -97,6 +106,7 @@ class _QuizViewScreenState extends State<QuizViewScreen>
     _ambiguate(WidgetsBinding.instance)?.removeObserver(this);
     _flashModeControlRowAnimationController.dispose();
     _exposureModeControlRowAnimationController.dispose();
+    _controller.dispose();
     super.dispose();
   }
 
@@ -169,6 +179,16 @@ class _QuizViewScreenState extends State<QuizViewScreen>
                                         color: Colors.black, fontSize: 80.sp),
                                   ),
                           ),
+                        ),
+                        Visibility(
+                          visible: _controller.value.isPlaying,
+                          child: Container(
+                              alignment: Alignment.center,
+                              height: 300,
+                              child: AspectRatio(
+                                aspectRatio: _controller.value.aspectRatio,
+                                child: VideoPlayer(_controller),
+                              )),
                         )
                       ],
                     ),
@@ -180,6 +200,11 @@ class _QuizViewScreenState extends State<QuizViewScreen>
                             ? 'Stop Recording'
                             : 'Start Recording',
                         onTapFunction: () {
+                          if (!controller!.value.isRecordingVideo) {
+                            isOnceRecorded = false;
+
+                            delayTime = 3;
+                          }
                           new Timer.periodic(
                             Duration(seconds: 1),
                             (Timer timer) {
@@ -212,6 +237,7 @@ class _QuizViewScreenState extends State<QuizViewScreen>
                               buildDialog(
                                 context: context,
                                 okTapFunction: () {
+                                  isOnceRecorded = false;
                                   delayTime = 3;
 
                                   Navigator.pop(context);
@@ -227,6 +253,35 @@ class _QuizViewScreenState extends State<QuizViewScreen>
                               );
                             }
                           }),
+                    ),
+                    Visibility(
+                      visible: isOnceRecorded,
+                      child: Container(
+                        alignment: Alignment.center,
+                        child: textButton(
+                            context: context,
+                            buttonName:
+                                _controller.value.isPlaying ? 'Stop' : 'Play',
+                            onTapFunction: () {
+                              if (_controller.value.isPlaying) {
+                                _controller.pause();
+                              } else {
+                                _controller = VideoPlayerController.file(
+                                    File(videoFile!.path))
+                                  ..initialize().then((_) {
+                                    _controller.play();
+                                    _controller.setLooping(true);
+
+                                    // Ensure the first frame is shown after the video is initialized, even before the play button has been pressed.
+                                    setState(() {});
+                                  }).catchError((onError) {
+                                    print('oasdjojd' + onError.toString());
+                                  });
+                              }
+
+                              setState(() {});
+                            }),
+                      ),
                     ),
                   ],
                 ),
@@ -417,6 +472,8 @@ class _QuizViewScreenState extends State<QuizViewScreen>
     stopVideoRecording().then((file) {
       if (file != null) {
         print('Video recorded to ${file.path}');
+        videoFile = file;
+        isOnceRecorded = true;
       }
     }).catchError((onError) {
       print('Error' + onError.toString());

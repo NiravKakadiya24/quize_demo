@@ -1,0 +1,4 @@
+#Mon Sep 06 10:42:49 IST 2021
+base.0=/Users/mac/Desktop/Client/demo_projects /quize_demo/build/app/intermediates/dex/release/minifyReleaseWithR8/classes.dex
+renamed.0=classes.dex
+path.0=classes.dex
